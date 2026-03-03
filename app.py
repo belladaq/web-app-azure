@@ -77,10 +77,31 @@ def create_app():
     }
     
     def build_calendar_matrix(year, month):
-        """Build a calendar matrix with mock data"""
+        """Build a calendar matrix"""
         cal = calendar.monthcalendar(year, month)
         today = date.today()
-        
+
+        # query args 
+        user_id = session['user'] # replace with user_id = current_user.id when we use flask-login
+        start = datetime(year, month, 1, tzinfo=timezone.utc)
+        end = datetime(year, month, calendar.monthrange(year, month)[1], 23, 59, 59, tzinfo=timezone.utc)
+
+        # querying db for user's entries in given month/year
+        try: 
+            raw_entries = list(db.mood_entries.find({'user_id': user_id, 'date': {'$gte': start, '$lte': end}})) 
+
+        except Exception as e:
+            app.logger.exception("Failed to get user entries for calendar view")
+
+        # creating entry key-value pairs for easy access
+        entries_dict = {}
+        for entry in raw_entries:
+            date_key = entry["date"].strftime("%Y-%m-%d")
+            entries_dict[date_key] = {
+                "mood": entry["mood_value"], 
+                "entry_id": str(entry["_id"])
+            }
+
         matrix = []
         for week in cal:
             week_data = []
@@ -96,14 +117,12 @@ def create_app():
                         'mood': None,
                         'entry_id': None
                     }
-                    
-                    if date_str in MOCK_ENTRIES:
-                        cell['mood'] = MOCK_ENTRIES[date_str]['mood']
-                        cell['entry_id'] = MOCK_ENTRIES[date_str]['entry_id']
+                    if date_str in entries_dict:
+                        cell['mood'] = entries_dict[date_str]['mood']
+                        cell['entry_id'] = str(entries_dict[date_str]['entry_id'])
                     
                     week_data.append(cell)
             matrix.append(week_data)
-        
         return matrix
     
     # =============================================
@@ -188,7 +207,8 @@ def create_app():
             if date_str:
                 entry_date = datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
             else:
-                entry_date = datetime.now(timezone.utc)
+                now = datetime.now() 
+                entry_date = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
 
             doc = {
                 "user_id": user_id,
