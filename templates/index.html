@@ -49,19 +49,26 @@
                 {% for cell in week %}
                     {% if cell.day is none %}
                         <div class="calendar-cell empty"></div>
-                    {% elif cell.mood %}
-                        <a href="{{ url_for('view_entry', entry_id=cell.entry_id) }}" 
-                           class="calendar-cell mood-{{ cell.mood }}{% if cell.is_today %} today{% endif %}">
+                    {% elif cell.has_link %}
+                        {% if cell.mood %}
+                            <a href="{{ url_for('view_entry', entry_id=cell.entry_id) }}" 
+                            class="calendar-cell mood-{{ cell.mood }}{% if cell.is_today %} today{% endif %}">
+                                {{ cell.day }}
+                            </a>
+                        {% else %}
+                            <a href="{{ url_for('add_entry', date=cell.date_str) }}" 
+                            class="calendar-cell no-entry{% if cell.is_today %} today{% endif %}">
+                                {{ cell.day }}
+                            </a>
+                        {% endif %}
+                    {% else %} 
+                        <div class="calendar-cell future">
                             {{ cell.day }}
-                        </a>
-                    {% else %}
-                        <a href="{{ url_for('add_entry', date=cell.date_str) }}" 
-                           class="calendar-cell no-entry{% if cell.is_today %} today{% endif %}">
-                            {{ cell.day }}
-                        </a>
+                        </div>
                     {% endif %}
                 {% endfor %}
             {% endfor %}
         </div>
     </div>
 {% endblock %}
+
