@@ -213,6 +213,13 @@ body {
     border: 2px solid var(--primary-color);
 }
 
+.calendar-cell.future {
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    cursor: default;
+}
+
 .calendar-cell.mood-1 { background-color: var(--mood-1); color: white; }
 .calendar-cell.mood-2 { background-color: var(--mood-2); color: white; }
 .calendar-cell.mood-3 { background-color: var(--mood-3); color: var(--text-primary); }

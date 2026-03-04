@@ -81,7 +81,7 @@ def create_app():
         """Build a calendar matrix"""
         cal = calendar.monthcalendar(year, month)
         today = date.today()
-
+        
         # query args 
 
 
@@ -99,7 +99,7 @@ def create_app():
             raw_entries = list(db.mood_entries.find({'user_id': user_id, 'date': {'$gte': start, '$lte': end}})) 
 
         except Exception as e:
-            app.logger.exception("Failed to get user entries for calendar view")
+            app.logger.exception("Failed to get user entries for calendar view. Error:", e)
 
         # creating entry key-value pairs for easy access
         entries_dict = {}
@@ -117,18 +117,19 @@ def create_app():
                 if day == 0:
                     week_data.append({'day': None})
                 else:
+                    current_date = date(year, month, day)
                     date_str = f"{year}-{month:02d}-{day:02d}"
                     cell = {
                         'day': day,
                         'date_str': date_str,
-                        'is_today': (year == today.year and month == today.month and day == today.day),
+                        'is_today': (current_date == today),
+                        'has_link': (current_date <= today),
                         'mood': None,
                         'entry_id': None
                     }
                     if date_str in entries_dict:
                         cell['mood'] = entries_dict[date_str]['mood']
                         cell['entry_id'] = str(entries_dict[date_str]['entry_id'])
-                    
                     week_data.append(cell)
             matrix.append(week_data)
         return matrix
@@ -169,14 +170,39 @@ def create_app():
     @app.route('/stats')
     def stats():
         """Analytics and stats page"""
-        return render_template('dashboard.html',
-                             total_entries=15,
-                             entries_this_month=7,
-                             average_mood=3.8,
-                             current_streak=5,
-                             mood_counts={1: 2, 2: 3, 3: 4, 4: 3, 5: 3},
-                             active_page='stats')
-    
+        # query args 
+        year = datetime.now().year
+        month = datetime.now().month
+        user_id = session['user'] # replace with user_id = current_user.id when we use flask-login
+        start = datetime(year, month, 1, tzinfo=timezone.utc)
+        end = datetime(year, month, calendar.monthrange(year, month)[1], 23, 59, 59, tzinfo=timezone.utc)
+
+        try: 
+            # querying db for user's entries in given month
+            entries = list(db.mood_entries.find({"user_id": user_id, "date": {"$gte": start, "$lte": end}})) 
+            # counting all entries ever
+            total_entries = db.mood_entries.count_documents({"user_id": user_id})
+            entries_this_month = len(entries)
+            # counting each mood value for the month
+            mood_counts = {1:0, 2:0, 3:0, 4:0, 5:0}
+            total = 0
+            for entry in entries:
+                mood_value = entry["mood_value"]
+                total += mood_value
+                mood_counts[mood_value] += 1
+
+            average_mood = total / entries_this_month if entries_this_month > 0 else None
+            
+            return render_template('dashboard.html',
+                                total_entries=total_entries,
+                                entries_this_month=entries_this_month,
+                                average_mood=average_mood,
+                                current_streak=5,
+                                mood_counts=mood_counts,
+                                active_page='stats')
+        except Exception as e:
+            app.logger.exception("Failed to retrieve stats. Error:", e)   
+
     @app.route('/settings')
     def settings():
         """Settings page"""
@@ -228,14 +254,14 @@ def create_app():
             db.mood_entries.insert_one(doc)
             
         except Exception as e:
-            app.logger.exception("Failed to create mood entry for user %s", user_id)
+            app.logger.exception("Failed to create mood entry. Error:", e)
 
         return redirect(url_for('home'))
     
     @app.route('/entries/<entry_id>')
     def view_entry(entry_id):
         """View a single entry"""
-        entries_collection = db["entries"]
+        entries_collection = db["mood_entries"]
         try:
             entry = entries_collection.find_one(
                 {"_id": ObjectId(entry_id)}
@@ -277,7 +303,7 @@ def create_app():
         query = request.args.get('q', '')
         mood_filter = request.args.get('mood', type=int)
         
-        entries_collection = db["entries"]
+        entries_collection = db["mood_entries"]
 
         filter_query = {}
 
