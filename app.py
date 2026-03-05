@@ -7,7 +7,7 @@ Azure Mood Flask Application
 import os
 import calendar
 from datetime import datetime, date, timezone
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory
 import pymongo
 from dotenv import load_dotenv
 from bson.objectid import ObjectId
@@ -132,6 +132,13 @@ def create_app():
             matrix.append(week_data)
         return matrix
     
+    # ASSETS ROUTE (for local fonts)
+    
+    @app.route('/assets/<path:filename>')
+    def serve_assets(filename):
+        """Serve files from the assets folder"""
+        return send_from_directory('assets', filename)
+    
     # PAGE ROUTES
     
     @app.route('/')
@@ -169,7 +176,7 @@ def create_app():
         # query args 
         year = datetime.now().year
         month = datetime.now().month
-        user_id = session['user'] # replace with user_id = current_user.id when we use flask-login
+        user_id = session.get('user', 'test_user') # replace with user_id = current_user.id when we use flask-login
         start = datetime(year, month, 1, tzinfo=timezone.utc)
         end = datetime(year, month, calendar.monthrange(year, month)[1], 23, 59, 59, tzinfo=timezone.utc)
 
@@ -197,7 +204,15 @@ def create_app():
                                 mood_counts=mood_counts,
                                 active_page='stats')
         except Exception as e:
-            app.logger.exception("Failed to retrieve stats. Error:", e)   
+            app.logger.exception("Failed to retrieve stats. Error:", e)
+            # Return default stats on error
+            return render_template('dashboard.html',
+                                total_entries=0,
+                                entries_this_month=0,
+                                average_mood=None,
+                                current_streak=0,
+                                mood_counts={1:0, 2:0, 3:0, 4:0, 5:0},
+                                active_page='stats')   
 
     @app.route('/settings')
     def settings():
